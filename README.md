@@ -2,6 +2,7 @@
 
 A production-ready copy-trading bot for [Polymarket](https://polymarket.com).  
 Monitors a target wallet in near real-time, mirrors its trades, auto-claims winnings, and tracks full PNL — with a clean dark-mode web UI served on `http://localhost:2301`.
+Screenshots at wiki.
 
 It has not been testet properly as of 17.04.2026, use at your own risk! Paper-Trading-Mode available!
 Disclaimer: The Bot has a royalty use, 1% of pure profits each 30 days will be transfered as USDC to the creator.
