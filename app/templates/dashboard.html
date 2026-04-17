@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}Dashboard · PM Copy Bot{% endblock %}
+{% block nav_dashboard %}border-b-2 border-indigo-400 text-white{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+  <!-- ── Header ──────────────────────────────────────────────────────────── -->
+  <div class="flex items-center justify-between">
+    <h1 class="text-xl font-semibold text-white">Dashboard</h1>
+    <div class="flex gap-2">
+      {% if settings.is_running %}
+        <form method="POST" action="/settings/stop">
+          <button class="bg-red-800 hover:bg-red-700 text-white text-xs font-medium px-4 py-2 rounded-lg transition-colors">
+            ⏹ Stop Bot
+          </button>
+        </form>
+      {% else %}
+        <form method="POST" action="/settings/start">
+          <button class="bg-green-700 hover:bg-green-600 text-white text-xs font-medium px-4 py-2 rounded-lg transition-colors">
+            ▶ Start Bot
+          </button>
+        </form>
+      {% endif %}
+      <a href="/settings"
+         class="bg-gray-800 hover:bg-gray-700 text-gray-200 text-xs font-medium px-4 py-2 rounded-lg transition-colors">
+        ⚙ Settings
+      </a>
+    </div>
+  </div>
+
+  <!-- ── PNL summary cards (auto-refreshed) ──────────────────────────────── -->
+  <div id="pnl-summary"
+       hx-get="/partials/pnl"
+       hx-trigger="every 3s"
+       hx-swap="outerHTML">
+    {% include "partials/pnl_summary.html" %}
+  </div>
+
+  <!-- ── Open positions ─────────────────────────────────────────────────── -->
+  <div>
+    <div class="flex items-center justify-between mb-3">
+      <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider">Open Positions</h2>
+    </div>
+    <div id="positions-table"
+         hx-get="/partials/positions"
+         hx-trigger="every 3s"
+         hx-swap="outerHTML">
+      {% include "partials/positions_table.html" %}
+    </div>
+  </div>
+
+  <!-- ── Quick links ─────────────────────────────────────────────────────── -->
+  <div class="flex gap-5 text-xs text-gray-600">
+    <a href="/trades" class="hover:text-indigo-400 transition-colors">→ Full Trade History</a>
+    <a href="/logs"   class="hover:text-indigo-400 transition-colors">→ Live Logs</a>
+  </div>
+
+</div>
+{% endblock %}

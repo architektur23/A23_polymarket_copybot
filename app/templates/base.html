@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}{{ bot_name }}{% endblock %}</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            surface: '#0f1117',
+            card:    '#161b27',
+            border:  '#1f2937',
+          }
+        }
+      }
+    }
+  </script>
+  <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
+</head>
+
+<body class="bg-[#0f1117] text-gray-100 min-h-screen flex flex-col antialiased text-sm">
+
+  <!-- ── Top nav ──────────────────────────────────────────────────────────── -->
+  <nav class="bg-[#161b27] border-b border-gray-800 px-6 py-0 flex items-stretch justify-between sticky top-0 z-50 h-12">
+    <div class="flex items-center gap-1">
+      <span class="font-bold text-base text-indigo-400 tracking-tight mr-4 flex items-center gap-1.5">
+        <!-- Paper copy / duplicate icon -->
+        <svg class="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="9" y="9" width="13" height="13" rx="2"/>
+          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+        </svg>
+        {{ bot_name }}
+      </span>
+
+      <a href="/"
+         class="px-3 h-full flex items-center text-gray-400 hover:text-white hover:bg-white/5 transition-colors {% block nav_dashboard %}{% endblock %}">
+        Dashboard
+      </a>
+      <a href="/trades"
+         class="px-3 h-full flex items-center text-gray-400 hover:text-white hover:bg-white/5 transition-colors {% block nav_trades %}{% endblock %}">
+        Trades
+      </a>
+      <a href="/logs"
+         class="px-3 h-full flex items-center text-gray-400 hover:text-white hover:bg-white/5 transition-colors {% block nav_logs %}{% endblock %}">
+        Logs
+      </a>
+      <a href="/settings"
+         class="px-3 h-full flex items-center text-gray-400 hover:text-white hover:bg-white/5 transition-colors {% block nav_settings %}{% endblock %}">
+        Settings
+      </a>
+    </div>
+
+    <div class="flex items-center"
+         id="status-bar"
+         hx-get="/partials/status"
+         hx-trigger="every 3s"
+         hx-swap="innerHTML">
+      {% include "partials/status_bar.html" %}
+    </div>
+  </nav>
+
+  <!-- ── Main content ─────────────────────────────────────────────────────── -->
+  <main class="flex-1 p-6 max-w-screen-xl mx-auto w-full">
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="text-center text-xs text-gray-700 py-3 border-t border-gray-800/50">
+    Polymarket Copy Bot &nbsp;·&nbsp; Always test in paper mode first
+  </footer>
+
+</body>
+</html>

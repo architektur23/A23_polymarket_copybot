@@ -1,0 +1,28 @@
+# ── Sensitive / local config ─────────────────────────────────────────────────
+.env
+
+# ── Database (contains private keys + trade history) ─────────────────────────
+data/bot.db
+data/bot.db-shm
+data/bot.db-wal
+data/*.db
+
+# ── Logs ─────────────────────────────────────────────────────────────────────
+data/logs/
+
+# ── Python ───────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+
+# ── Claude Code internal ─────────────────────────────────────────────────────
+.claude/
+
+# ── OS ───────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db

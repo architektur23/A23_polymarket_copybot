@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Trades · PM Copy Bot{% endblock %}
+{% block nav_trades %}border-b-2 border-indigo-400 text-white{% endblock %}
+
+{% block content %}
+<div class="space-y-5">
+
+  <div class="flex items-center justify-between">
+    <h1 class="text-xl font-semibold text-white">Trade History</h1>
+    <a href="/trades/export"
+       class="bg-gray-800 hover:bg-gray-700 text-gray-200 text-xs font-medium px-4 py-2 rounded-lg transition-colors">
+      ⬇ Export CSV
+    </a>
+  </div>
+
+  <!-- ── Filters ──────────────────────────────────────────────────────────── -->
+  <form hx-get="/trades/data"
+        hx-target="#trades-container"
+        hx-swap="outerHTML"
+        hx-trigger="input delay:400ms, submit"
+        class="flex flex-wrap gap-3 items-end bg-[#161b27] border border-gray-800 rounded-xl p-4">
+
+    <div class="space-y-1">
+      <label class="block text-xs text-gray-500">Market</label>
+      <input type="text" name="market" placeholder="Search..."
+             class="bg-gray-900 border border-gray-700 rounded-lg px-3 py-1.5 text-gray-200 text-xs w-44
+                    placeholder-gray-600 focus:outline-none focus:border-indigo-500" />
+    </div>
+
+    <div class="space-y-1">
+      <label class="block text-xs text-gray-500">Side</label>
+      <select name="side"
+              class="bg-gray-900 border border-gray-700 rounded-lg px-3 py-1.5 text-gray-200 text-xs w-24
+                     focus:outline-none focus:border-indigo-500">
+        <option value="">All</option>
+        <option value="BUY">BUY</option>
+        <option value="SELL">SELL</option>
+      </select>
+    </div>
+
+    <div class="space-y-1">
+      <label class="block text-xs text-gray-500">Status</label>
+      <select name="status"
+              class="bg-gray-900 border border-gray-700 rounded-lg px-3 py-1.5 text-gray-200 text-xs w-28
+                     focus:outline-none focus:border-indigo-500">
+        <option value="">All</option>
+        <option value="filled">Filled</option>
+        <option value="paper">Paper</option>
+        <option value="failed">Failed</option>
+        <option value="partial">Partial</option>
+      </select>
+    </div>
+
+    <input type="hidden" name="page" value="1" />
+    <button type="submit"
+            class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium px-4 py-1.5 rounded-lg transition-colors">
+      Filter
+    </button>
+  </form>
+
+  <!-- ── Trades table ─────────────────────────────────────────────────────── -->
+  <div id="trades-container"
+       hx-get="/trades/data"
+       hx-trigger="every 3s"
+       hx-swap="outerHTML">
+    <div class="text-gray-600 text-xs py-4">Loading trades…</div>
+  </div>
+
+</div>
+{% endblock %}

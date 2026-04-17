@@ -1,0 +1,396 @@
+{% extends "base.html" %}
+{% block title %}Settings · PM Copy Bot{% endblock %}
+{% block nav_settings %}border-b-2 border-indigo-400 text-white{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl space-y-6">
+
+  <div class="flex items-center justify-between">
+    <h1 class="text-xl font-semibold text-white">Settings</h1>
+  </div>
+
+  {% if saved %}
+  <div class="bg-green-950 border border-green-800 text-green-300 rounded-lg px-4 py-3 text-sm flex items-center gap-2">
+    <span>✓</span> Settings saved successfully.
+  </div>
+  {% endif %}
+
+  <form method="POST" action="/settings" class="space-y-5">
+
+    <!-- ── Bot Name ──────────────────────────────────────────────────────── -->
+    <div class="bg-[#161b27] border border-gray-800 rounded-xl overflow-hidden">
+      <div class="px-5 py-3 border-b border-gray-800">
+        <h2 class="text-sm font-semibold text-indigo-400 uppercase tracking-wider">Bot Name</h2>
+      </div>
+      <div class="p-5 space-y-1.5">
+        <label class="block text-xs font-medium text-gray-400">Display name
+          <span class="text-gray-600 font-normal ml-1">(shown in the nav and browser tab)</span>
+        </label>
+        <input type="text" name="bot_name"
+               value="{{ settings.bot_name }}"
+               placeholder="PM Copy"
+               maxlength="32"
+               class="w-64 bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-gray-100 text-sm
+                      placeholder-gray-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500" />
+      </div>
+    </div>
+
+    <!-- ── Polymarket Credentials ─────────────────────────────────────────── -->
+    <div class="bg-[#161b27] border border-gray-800 rounded-xl overflow-hidden">
+      <div class="px-5 py-3 border-b border-gray-800 flex items-center justify-between">
+        <h2 class="text-sm font-semibold text-indigo-400 uppercase tracking-wider">Polymarket Credentials</h2>
+        {% if settings.poly_private_key %}
+          <span class="text-xs bg-green-950 text-green-400 border border-green-800 px-2 py-0.5 rounded-full">Key saved</span>
+        {% else %}
+          <span class="text-xs bg-yellow-950 text-yellow-400 border border-yellow-800 px-2 py-0.5 rounded-full">Key not set</span>
+        {% endif %}
+      </div>
+
+      <div class="p-5 space-y-5">
+        <p class="text-xs text-gray-500 bg-gray-900/50 border border-gray-800 rounded-lg px-3 py-2">
+          Your private key is stored locally in this machine's database and never transmitted anywhere.
+          Use a dedicated trading wallet — not your main wallet.
+        </p>
+
+        <!-- Private key -->
+        <div class="space-y-1.5">
+          <label class="block text-xs font-medium text-gray-400">Private Key
+            <span class="text-gray-600 font-normal ml-1">64 hex chars, 0x-prefixed</span>
+          </label>
+          <input type="password"
+                 name="poly_private_key"
+                 placeholder="{% if settings.poly_private_key %}Leave blank to keep existing key{% else %}0x...{% endif %}"
+                 autocomplete="new-password"
+                 class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-gray-100 font-mono text-xs
+                        placeholder-gray-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500" />
+          <p class="text-xs text-gray-600">
+            MetaMask → Account details → Show private key
+          </p>
+        </div>
+
+        <!-- Funder address -->
+        <div class="space-y-1.5">
+          <label class="block text-xs font-medium text-gray-400">Funder Address
+            <span class="text-gray-600 font-normal ml-1">optional — auto-derived from key if blank</span>
+          </label>
+          <input type="text"
+                 name="poly_funder_address"
+                 value="{{ settings.poly_funder_address }}"
+                 placeholder="0x..."
+                 class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-gray-100 font-mono text-xs
+                        placeholder-gray-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500" />
+        </div>
+
+        <!-- Wallet type -->
+        <div class="space-y-1.5">
+          <label class="block text-xs font-medium text-gray-400">Wallet Type</label>
+          <select name="poly_signature_type"
+                  class="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-gray-100 text-xs
+                         focus:outline-none focus:border-indigo-500">
+            <option value="0" {% if settings.poly_signature_type == 0 %}selected{% endif %}>0 — EOA (MetaMask / hardware wallet)</option>
+            <option value="1" {% if settings.poly_signature_type == 1 %}selected{% endif %}>1 — POLY_PROXY (Magic Link / email wallet)</option>
+            <option value="2" {% if settings.poly_signature_type == 2 %}selected{% endif %}>2 — GNOSIS_SAFE (Safe multisig)</option>
+          </select>
+        </div>
+
+        <!-- API Credentials (optional) -->
+        <details class="group">
+          <summary class="flex items-center gap-2 cursor-pointer text-xs text-gray-500 hover:text-gray-300 select-none list-none">
+            <svg class="w-3 h-3 transition-transform group-open:rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+            </svg>
+            <span>Advanced: Polymarket API Key
+              <span class="text-gray-700 ml-1">(optional — auto-derived from private key if blank)</span>
+            </span>
+            {% if settings.poly_api_key %}
+              <span class="text-xs bg-green-950 text-green-500 border border-green-900 px-1.5 py-0.5 rounded">set</span>
+            {% endif %}
+          </summary>
+
+          <div class="mt-4 space-y-4 pl-4 border-l border-gray-800">
+            <p class="text-xs text-gray-600">
+              The L2 API credentials are automatically derived from your private key.
+              Only fill these in if you created an API key manually via the Polymarket builder dashboard
+              and want to use it directly.
+            </p>
+            <div class="space-y-1.5">
+              <label class="block text-xs font-medium text-gray-400">API Key (UUID)</label>
+              <input type="text" name="poly_api_key"
+                     value="{{ settings.poly_api_key }}"
+                     placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                     class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-gray-100 font-mono text-xs
+                            placeholder-gray-600 focus:outline-none focus:border-indigo-500" />
+            </div>
+            <div class="space-y-1.5">
+              <label class="block text-xs font-medium text-gray-400">API Secret</label>
+              <input type="password" name="poly_api_secret"
+                     placeholder="{% if settings.poly_api_secret %}saved{% else %}base64 string{% endif %}"
+                     class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-gray-100 font-mono text-xs
+                            placeholder-gray-600 focus:outline-none focus:border-indigo-500" />
+            </div>
+            <div class="space-y-1.5">
+              <label class="block text-xs font-medium text-gray-400">API Passphrase</label>
+              <input type="password" name="poly_api_passphrase"
+                     placeholder="{% if settings.poly_api_passphrase %}saved{% else %}passphrase{% endif %}"
+                     class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-gray-100 font-mono text-xs
+                            placeholder-gray-600 focus:outline-none focus:border-indigo-500" />
+            </div>
+          </div>
+        </details>
+
+      </div>
+    </div>
+
+    <!-- ── Copy Target ────────────────────────────────────────────────────── -->
+    <div class="bg-[#161b27] border border-gray-800 rounded-xl overflow-hidden">
+      <div class="px-5 py-3 border-b border-gray-800">
+        <h2 class="text-sm font-semibold text-indigo-400 uppercase tracking-wider">Copy Target</h2>
+      </div>
+      <div class="p-5 space-y-4">
+        <div class="space-y-1.5">
+          <label class="block text-xs font-medium text-gray-400">Target Wallet Address</label>
+          <input type="text" name="target_wallet"
+                 value="{{ settings.target_wallet }}"
+                 placeholder="0x..."
+                 class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-gray-100 font-mono text-xs
+                        placeholder-gray-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500" />
+          <p class="text-xs text-gray-600">The Polymarket wallet whose trades you want to mirror.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Trading Mode ───────────────────────────────────────────────────── -->
+    <div class="bg-[#161b27] border border-gray-800 rounded-xl overflow-hidden">
+      <div class="px-5 py-3 border-b border-gray-800">
+        <h2 class="text-sm font-semibold text-indigo-400 uppercase tracking-wider">Trading Mode</h2>
+      </div>
+      <div class="p-5 space-y-4">
+        <label class="flex items-center gap-3 cursor-pointer">
+          <input type="checkbox" name="paper_trading"
+                 {% if settings.paper_trading %}checked{% endif %}
+                 class="w-4 h-4 rounded accent-indigo-500 cursor-pointer" />
+          <div>
+            <span class="text-sm text-gray-200 font-medium">Paper Trading</span>
+            <p class="text-xs text-gray-500 mt-0.5">Simulate trades without placing real orders. Uncheck to enable live trading.</p>
+          </div>
+        </label>
+        <div class="space-y-1.5 border-t border-gray-800 pt-4">
+          <label class="block text-xs font-medium text-gray-400">
+            Simulated Equity
+            <span class="text-gray-600 font-normal ml-1">(USDC — used for position sizing in paper mode)</span>
+          </label>
+          <div class="flex items-center gap-2">
+            <span class="text-xs text-gray-500">$</span>
+            <input type="number" name="paper_balance_usdc"
+                   value="{{ settings.paper_balance_usdc }}"
+                   min="1" max="10000000" step="1"
+                   class="w-40 bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-gray-100 text-sm
+                          focus:outline-none focus:border-indigo-500" />
+          </div>
+          <p class="text-xs text-gray-600">
+            In live mode the real wallet USDC balance is used. This value is only used when paper trading is active.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Position Sizing ────────────────────────────────────────────────── -->
+    <div class="bg-[#161b27] border border-gray-800 rounded-xl overflow-hidden">
+      <div class="px-5 py-3 border-b border-gray-800">
+        <h2 class="text-sm font-semibold text-indigo-400 uppercase tracking-wider">Position Sizing</h2>
+      </div>
+      <div class="p-5 space-y-5">
+
+        <!-- Mode selector -->
+        <div class="flex gap-6">
+          <label class="flex items-center gap-2.5 cursor-pointer">
+            <input type="radio" name="sizing_mode" value="proportional"
+                   id="mode-proportional"
+                   class="accent-indigo-500"
+                   onchange="toggleSizing('proportional')" />
+            <div>
+              <span class="text-gray-200 text-xs font-medium">Mirror equity %</span>
+              <p class="text-gray-600 text-xs">Auto-detect how much % of their equity the wallet used, apply same % to yours</p>
+            </div>
+          </label>
+          <label class="flex items-center gap-2.5 cursor-pointer">
+            <input type="radio" name="sizing_mode" value="fixed"
+                   id="mode-fixed"
+                   class="accent-indigo-500"
+                   onchange="toggleSizing('fixed')" />
+            <div>
+              <span class="text-gray-200 text-xs font-medium">Fixed USDC</span>
+              <p class="text-gray-600 text-xs">Same flat amount per trade regardless of source size</p>
+            </div>
+          </label>
+        </div>
+
+        <!-- Proportional fields -->
+        <div id="pct-fields" class="space-y-1.5">
+          <label class="block text-xs font-medium text-gray-400">
+            Minimum trade size
+            <span class="text-gray-600 font-normal">(USDC — floor for both modes)</span>
+          </label>
+          <input type="number" name="min_trade_usdc"
+                 value="{{ settings.min_trade_usdc }}" min="1" step="0.5"
+                 class="w-32 bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-gray-100 text-xs
+                        focus:outline-none focus:border-indigo-500" />
+          <p class="text-xs text-gray-600">
+            If the calculated proportional amount is below this, the trade will use this minimum instead.
+          </p>
+        </div>
+
+        <!-- Fixed fields -->
+        <div id="fixed-fields" class="space-y-1.5">
+          <label class="block text-xs font-medium text-gray-400">Fixed USDC per trade</label>
+          <input type="number" name="fixed_trade_usdc"
+                 value="{{ settings.fixed_trade_usdc }}" min="1" step="1"
+                 class="w-32 bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-gray-100 text-xs
+                        focus:outline-none focus:border-indigo-500" />
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ── Risk Limits ────────────────────────────────────────────────────── -->
+    <div class="bg-[#161b27] border border-gray-800 rounded-xl overflow-hidden">
+      <div class="px-5 py-3 border-b border-gray-800">
+        <h2 class="text-sm font-semibold text-indigo-400 uppercase tracking-wider">Risk Limits</h2>
+      </div>
+      <div class="p-5 space-y-4">
+        <div class="grid grid-cols-2 gap-4">
+          <div class="space-y-1.5">
+            <label class="block text-xs font-medium text-gray-400">Max exposure <span class="text-gray-600">(% of balance, 0 = off)</span></label>
+            <input type="number" name="max_exposure_pct"
+                   value="{{ settings.max_exposure_pct }}" min="0" max="100" step="1"
+                   class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-gray-100 text-xs
+                          focus:outline-none focus:border-indigo-500" />
+          </div>
+          <div class="space-y-1.5">
+            <label class="block text-xs font-medium text-gray-400">Per-trade cap <span class="text-gray-600">(USDC, 0 = off)</span></label>
+            <input type="number" name="max_position_usdc"
+                   value="{{ settings.max_position_usdc }}" min="0" step="1"
+                   class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-gray-100 text-xs
+                          focus:outline-none focus:border-indigo-500" />
+          </div>
+        </div>
+        <div class="space-y-1.5">
+          <label class="block text-xs font-medium text-gray-400">Blacklisted markets <span class="text-gray-600">(comma-separated conditionIds)</span></label>
+          <textarea name="blacklisted_markets" rows="2"
+                    placeholder="0xabc..., 0xdef..."
+                    class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-gray-100 font-mono text-xs
+                           placeholder-gray-600 focus:outline-none focus:border-indigo-500 resize-none">{{ settings.blacklisted_markets }}</textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Polling & Notifications ───────────────────────────────────────── -->
+    <div class="bg-[#161b27] border border-gray-800 rounded-xl overflow-hidden">
+      <div class="px-5 py-3 border-b border-gray-800">
+        <h2 class="text-sm font-semibold text-indigo-400 uppercase tracking-wider">Polling & Notifications</h2>
+      </div>
+      <div class="p-5 grid grid-cols-2 gap-4">
+        <div class="space-y-1.5">
+          <label class="block text-xs font-medium text-gray-400">Poll interval <span class="text-gray-600">(seconds, min 5)</span></label>
+          <input type="number" name="poll_interval_seconds"
+                 value="{{ settings.poll_interval_seconds }}" min="5" max="3600" step="1"
+                 class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-gray-100 text-xs
+                        focus:outline-none focus:border-indigo-500" />
+        </div>
+        <div class="space-y-1.5">
+          <label class="block text-xs font-medium text-gray-400">Webhook URL <span class="text-gray-600">(Telegram / Discord, optional)</span></label>
+          <input type="url" name="webhook_url"
+                 value="{{ settings.webhook_url or '' }}"
+                 placeholder="https://discord.com/api/webhooks/..."
+                 class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-gray-100 text-xs
+                        placeholder-gray-600 focus:outline-none focus:border-indigo-500" />
+        </div>
+      </div>
+    </div>
+
+    <button type="submit"
+            class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-lg px-4 py-2.5 text-sm transition-colors">
+      Save Settings
+    </button>
+  </form>
+
+  <!-- ── Royalty Info ─────────────────────────────────────────────────────── -->
+  <div class="bg-[#161b27] border border-gray-800 rounded-xl overflow-hidden">
+    <div class="px-5 py-3 border-b border-gray-800">
+      <h2 class="text-sm font-semibold text-indigo-400 uppercase tracking-wider">About the Royalty System</h2>
+    </div>
+    <div class="p-5 space-y-3 text-xs text-gray-400">
+      <p>
+        This bot uses a <span class="text-gray-200 font-medium">profit-share model</span> instead of an upfront fee.
+        Once every <span class="text-gray-200 font-medium">30 days</span>, the bot automatically calculates your
+        net realized profit from live trades over the previous 30 days. If there was a net profit,
+        <span class="text-gray-200 font-medium">1% of that amount</span> is transferred in USDC to the developer's
+        wallet on the Polygon network.
+      </p>
+      <ul class="space-y-1.5 text-gray-500">
+        <li class="flex items-start gap-2">
+          <span class="text-green-500 mt-0.5">✓</span>
+          <span>No profit made → <span class="text-gray-300">nothing is sent</span></span>
+        </li>
+        <li class="flex items-start gap-2">
+          <span class="text-green-500 mt-0.5">✓</span>
+          <span>Paper trading mode → <span class="text-gray-300">no transfer, ever</span> (no real USDC involved)</span>
+        </li>
+        <li class="flex items-start gap-2">
+          <span class="text-green-500 mt-0.5">✓</span>
+          <span>The transfer comes from your trading wallet automatically — no manual action needed</span>
+        </li>
+        <li class="flex items-start gap-2">
+          <span class="text-green-500 mt-0.5">✓</span>
+          <span>Every transfer is logged in the <a href="/logs" class="text-indigo-400 hover:text-indigo-300">Logs</a> page and sent via webhook if configured</span>
+        </li>
+        <li class="flex items-start gap-2">
+          <span class="text-yellow-600 mt-0.5">!</span>
+          <span>Make sure your wallet holds a small amount of <span class="text-gray-300">POL</span> for Polygon gas fees</span>
+        </li>
+      </ul>
+      <p class="text-gray-600">
+        Example: if you made $200 profit over 30 days, the bot sends $2.00 USDC to the developer. If you made $0 or a loss, nothing is sent.
+      </p>
+    </div>
+  </div>
+
+  <!-- ── One-time Allowance Setup ──────────────────────────────────────────── -->
+  <div class="bg-[#161b27] border border-gray-800 rounded-xl overflow-hidden">
+    <div class="px-5 py-3 border-b border-gray-800">
+      <h2 class="text-sm font-semibold text-indigo-400 uppercase tracking-wider">One-time Setup: Token Allowances</h2>
+    </div>
+    <div class="p-5 space-y-3">
+      <p class="text-xs text-gray-500">
+        Before live trading you must approve USDC.e and CTF token spending for all 3 Polymarket
+        exchange contracts. This sends up to 6 on-chain transactions and requires POL for gas.
+        Only needs to be done once per wallet.
+      </p>
+      <button class="bg-amber-600 hover:bg-amber-500 text-white font-medium rounded-lg px-4 py-2 text-sm transition-colors
+                     flex items-center gap-2"
+              hx-post="/settings/approve-allowances"
+              hx-target="#allowance-result"
+              hx-swap="innerHTML"
+              hx-indicator="#allowance-spinner">
+        Set Allowances
+        <span id="allowance-spinner" class="htmx-indicator animate-spin opacity-0">⟳</span>
+      </button>
+      <div id="allowance-result"></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  function toggleSizing(mode) {
+    document.getElementById('pct-fields').style.display   = (mode === 'proportional') ? '' : 'none';
+    document.getElementById('fixed-fields').style.display = (mode === 'fixed')         ? '' : 'none';
+  }
+
+  // Use .value to get the plain string from the Python str-enum
+  // (Python 3.11+ str(StrEnum) returns 'EnumName.member', not the value)
+  var currentMode = '{{ settings.sizing_mode.value }}';
+  document.getElementById('mode-' + currentMode).checked = true;
+  toggleSizing(currentMode);
+</script>
+{% endblock %}

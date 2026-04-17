@@ -1,0 +1,7 @@
+{% if lines %}
+  {% for line in lines %}
+    <div class="{% if '[ERROR]' in line %}text-red-400{% elif '[WARN]' in line %}text-yellow-400{% elif '[PAPER]' in line %}text-amber-300{% elif '[LIVE]' in line %}text-green-300{% elif '[CLAIM]' in line %}text-indigo-300{% else %}text-gray-400{% endif %} leading-relaxed">{{ line }}</div>
+  {% endfor %}
+{% else %}
+  <div class="text-gray-600 italic">No log entries yet.</div>
+{% endif %}
