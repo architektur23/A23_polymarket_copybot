@@ -9,7 +9,7 @@ sqlmodel==0.0.22
 aiosqlite==0.20.0           # async SQLite driver
 
 # ── Polymarket / blockchain ───────────────────────────────────────────────────
-py-clob-client==0.34.6
+py-clob-client-v2==1.0.0
 web3==7.6.0
 
 # ── Scheduler ────────────────────────────────────────────────────────────────

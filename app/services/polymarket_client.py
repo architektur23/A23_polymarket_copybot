@@ -29,20 +29,20 @@ logger = logging.getLogger(__name__)
 # ── Lazy imports for py-clob-client (only available at runtime) ──────────────
 # We guard these so that unit-tests or UI-only runs don't hard-fail.
 try:
-    from py_clob_client.client import ClobClient
-    from py_clob_client.clob_types import (
+    from py_clob_client_v2.client import ClobClient
+    from py_clob_client_v2.clob_types import (
         ApiCreds,
         MarketOrderArgs,
         OrderArgs,
         OrderType,
         TradeParams,
     )
-    from py_clob_client.constants import AMOY, POLYGON
-    from py_clob_client.order_builder.constants import BUY, SELL
+    from py_clob_client_v2.constants import AMOY, POLYGON
+    from py_clob_client_v2.order_builder.constants import BUY, SELL
     _CLOB_AVAILABLE = True
 except ImportError:
     _CLOB_AVAILABLE = False
-    logger.warning("py-clob-client not installed — live trading disabled")
+    logger.warning("py-clob-client-v2 not installed — live trading disabled")
 
 # ── Web3 for on-chain allowance setup ────────────────────────────────────────
 try:
@@ -53,11 +53,13 @@ except ImportError:
     _WEB3_AVAILABLE = False
 
 # ── Contract constants ────────────────────────────────────────────────────────
-CTF_EXCHANGE        = "0x4bFb41d5B3570DeFd03C39a9A4D8dE6Bd8B8982E"
-NEG_RISK_EXCHANGE   = "0xC5d563A36AE78145C45a50134d48A1215220f80a"
-NEG_RISK_ADAPTER    = "0xd91E80cF2E7be2e162c6513ceD06f1dD0dA35296"
-CTF_ADDRESS         = "0x4D97DCd97eC945f40cF65F87097ACe5EA0476045"
-USDC_ADDRESS        = "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174"
+CTF_EXCHANGE          = "0x4bFb41d5B3570DeFd03C39a9A4D8dE6Bd8B8982E"
+NEG_RISK_EXCHANGE     = "0xC5d563A36AE78145C45a50134d48A1215220f80a"
+NEG_RISK_ADAPTER      = "0xd91E80cF2E7be2e162c6513ceD06f1dD0dA35296"
+CTF_EXCHANGE_V2       = "0xE111180000d2663C0091e4f400237545B87B996B"
+NEG_RISK_EXCHANGE_V2  = "0xe2222d279d744050d28e00520010520000310F59"
+CTF_ADDRESS           = "0x4D97DCd97eC945f40cF65F87097ACe5EA0476045"
+USDC_ADDRESS          = "0xC011a7E12a19f7B1f670d46F03B03f3342E82DFB"  # pUSD (replaces USDC.e)
 
 MAX_INT = 2**256 - 1  # unlimited allowance
 
@@ -221,7 +223,7 @@ class PolymarketClient:
             )
             logger.info("Using manually-provided L2 API credentials")
         else:
-            creds = self._clob.create_or_derive_api_creds()
+            creds = self._clob.create_or_derive_api_key()
             logger.info("L2 API credentials auto-derived from private key")
 
         self._clob.set_api_creds(creds)
@@ -243,7 +245,7 @@ class PolymarketClient:
 
     async def setup_allowances(self) -> dict[str, str]:
         """
-        Approve USDC.e + CTF tokens for all 3 exchange contracts.
+        Approve pUSD + CTF tokens for all exchange contracts (V1 + V2).
         Returns a dict of contract → tx_hash.
         """
         if not _WEB3_AVAILABLE:
@@ -267,7 +269,7 @@ class PolymarketClient:
         usdc = w3.eth.contract(address=Web3.to_checksum_address(USDC_ADDRESS), abi=ERC20_ABI)
         ctf  = w3.eth.contract(address=Web3.to_checksum_address(CTF_ADDRESS),  abi=ERC1155_ABI)
 
-        targets = [CTF_EXCHANGE, NEG_RISK_EXCHANGE, NEG_RISK_ADAPTER]
+        targets = [CTF_EXCHANGE, NEG_RISK_EXCHANGE, NEG_RISK_ADAPTER, CTF_EXCHANGE_V2, NEG_RISK_EXCHANGE_V2]
 
         for target in targets:
             cs_target = Web3.to_checksum_address(target)
@@ -387,7 +389,7 @@ class PolymarketClient:
 
     async def get_usdc_balance(self) -> float:
         """
-        Return the USDC.e balance (human-readable) for our funder address.
+        Return the pUSD balance (human-readable) for our funder address.
         Uses a direct JSON-RPC call to the ERC-20 balanceOf method.
         """
         if not self._ready or not _WEB3_AVAILABLE:
@@ -414,7 +416,7 @@ class PolymarketClient:
 
     async def transfer_usdc(self, recipient: str, amount_usdc: float) -> str:
         """
-        Transfer amount_usdc USDC.e to recipient on Polygon.
+        Transfer amount_usdc pUSD to recipient on Polygon.
         Returns the transaction hash as a hex string.
         Raises on failure.
         """
@@ -439,7 +441,7 @@ class PolymarketClient:
             address=Web3.to_checksum_address(USDC_ADDRESS), abi=ERC20_ABI
         )
 
-        # USDC.e uses 6 decimal places
+        # pUSD uses 6 decimal places
         amount_raw = int(amount_usdc * 1_000_000)
 
         nonce = w3.eth.get_transaction_count(addr)
