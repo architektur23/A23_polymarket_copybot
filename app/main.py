@@ -61,6 +61,21 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         bot_cfg.bot_name if bot_cfg else "PM Copy"
     )
 
+    # 3b. Snapshot current time so the first poll ignores historical trades.
+    #     Only needed on a truly fresh DB (last_seen_trade_ts is None).
+    if bot_cfg and bot_cfg.last_seen_trade_ts is None:
+        from datetime import datetime, timezone
+        from app.services.monitor import now_utc_ts
+        async with get_session() as session:
+            from sqlmodel import select as _select
+            result2 = await session.exec(_select(BotSettings).where(BotSettings.id == 1))
+            settings_row = result2.first()
+            if settings_row:
+                settings_row.last_seen_trade_ts = now_utc_ts()
+                session.add(settings_row)
+                await session.commit()
+        logger.info("Startup snapshot: last_seen_trade_ts set to now — historical trades will be ignored")
+
     # 4. Start background scheduler
     from app.scheduler import start_scheduler
 
