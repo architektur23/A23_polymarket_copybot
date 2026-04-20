@@ -29,7 +29,7 @@ Disclaimer: The Bot has a royalty system — 1% of net profits every 30 days wil
 ### 1. Prerequisites
 
 - Python 3.12+
-- A Polygon wallet with USDC.e (for live trading)
+- A Polygon wallet with pUSD (for live trading)
 - POL for gas fees (for live trading)
 
 ### 2. Install
@@ -71,7 +71,7 @@ Open **http://localhost:2301** in your browser and go to **Settings** to enter y
 
 1. Open **Settings** and enter your **Private Key** and **Target Wallet Address**
 2. Keep **Paper Trading** enabled and click **Save**
-3. Click **Set Allowances** (approves USDC.e + CTF tokens on-chain — one-time, requires POL gas)
+3. Click **Set Allowances** (approves pUSD + CTF tokens on-chain — one-time, requires POL gas)
 4. Once confirmed, disable **Paper Trading**, save, and start the bot
 
 ---
@@ -185,7 +185,7 @@ FastAPI app (main.py)
 │   └── collect_royalty    Every 30 days — transfer 1% of net profit
 │
 └── Services
-    ├── polymarket_client  py-clob-client wrapper + Web3 transfers
+    ├── polymarket_client  py-clob-client-v2 wrapper + Web3 transfers
     ├── monitor            Data API polling for target wallet
     ├── trader             Copy-trade logic (size calc, order placement)
     ├── claimer            On-chain redeemPositions calls
