@@ -99,37 +99,29 @@ docker run -d \
 
 ## Unraid Deployment
 
-### Step 1 — Add the container
+### Step 1 — Open a terminal
 
-In Unraid go to **Docker → Add Container**:
+In the Unraid UI go to **Tools → Terminal** (or SSH into your server).
 
-| Field | Value |
-|-------|-------|
-| Name | `pm-copy-bot` |
-| Repository | `pm-copy-bot` |
-| Network Type | `bridge` |
-| Port (host → container) | `2301:2301` |
+### Step 2 — Clone the repo and build the image
 
-### Step 2 — Map the data volume
-
-Add a **Path** mapping:
-
-| Field | Value |
-|-------|-------|
-| Container Path | `/app/data` |
-| Host Path | `/mnt/user/appdata/pm-copy-bot` |
-| Access Mode | Read/Write |
-
-### Step 3 — Apply and open
-
-Click **Apply**. Once running, open:
-```
-http://YOUR_UNRAID_IP:2301
+```bash
+cd /mnt/user/appdata
+git clone https://github.com/architektur23/A23_polymarket_copybot.git pm-copy-bot-src
+cd pm-copy-bot-src
+docker build -t pm-copy-bot .
 ```
 
-Go to **Settings** to enter your Polymarket credentials and configure the bot.
+The build takes a few minutes (compiling Web3 dependencies).
 
-### One-command equivalent (Unraid CLI)
+### Step 3 — Create the data directory
+
+```bash
+mkdir -p /mnt/user/appdata/pm-copy-bot/logs
+chown -R 1000:1000 /mnt/user/appdata/pm-copy-bot
+```
+
+### Step 4 — Run the container
 
 ```bash
 docker run -d \
@@ -139,6 +131,33 @@ docker run -d \
   -v /mnt/user/appdata/pm-copy-bot:/app/data \
   pm-copy-bot
 ```
+
+### Step 5 — Open the UI
+
+```
+http://YOUR_UNRAID_IP:2301
+```
+
+Go to **Settings** to enter your Target Wallet and configure the bot.
+
+---
+
+### Updating after a new release
+
+```bash
+cd /mnt/user/appdata/pm-copy-bot-src
+git pull
+docker build -t pm-copy-bot .
+docker stop pm-copy-bot && docker rm pm-copy-bot
+docker run -d \
+  --name pm-copy-bot \
+  --restart unless-stopped \
+  -p 2301:2301 \
+  -v /mnt/user/appdata/pm-copy-bot:/app/data \
+  pm-copy-bot
+```
+
+Your database and logs in `/mnt/user/appdata/pm-copy-bot` are preserved across updates.
 
 ---
 
