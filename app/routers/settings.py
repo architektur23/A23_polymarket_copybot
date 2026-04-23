@@ -1,11 +1,13 @@
 """
 Settings routes.
 
-GET  /settings        → settings page
-POST /settings        → save settings
-POST /settings/start  → start bot
-POST /settings/stop   → stop bot
-POST /settings/approve-allowances → trigger on-chain approval setup
+GET  /settings                      → settings page
+POST /settings                      → save settings
+POST /settings/start                → start bot
+POST /settings/stop                 → stop bot
+POST /settings/reset-paper          → wipe all paper trades & positions
+POST /settings/stop-and-sell        → stop bot and market-sell all open positions
+POST /settings/approve-allowances   → trigger on-chain approval setup
 """
 
 from __future__ import annotations
@@ -39,12 +41,13 @@ async def settings_page(
     request: Request,
     session: AsyncSession = Depends(get_db),
     saved: bool = False,
+    reset: bool = False,
 ) -> HTMLResponse:
     result = await session.exec(select(BotSettings).where(BotSettings.id == 1))
     s = result.first() or BotSettings(id=1)
     return _templates(request).TemplateResponse(
         "settings.html",
-        {"request": request, "settings": s, "saved": saved},
+        {"request": request, "settings": s, "saved": saved, "reset": reset},
     )
 
 
@@ -179,6 +182,117 @@ async def stop_bot(
         session.add(s)
         await session.commit()
         logger.info("Bot stopped")
+    return RedirectResponse(url="/", status_code=303)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Reset paper trading data
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.post("/reset-paper", response_class=HTMLResponse)
+async def reset_paper(
+    request: Request,
+    session: AsyncSession = Depends(get_db),
+) -> HTMLResponse:
+    from sqlmodel import delete
+    from app.models.position import Position
+    from app.models.trade import Trade
+
+    await session.exec(delete(Trade).where(Trade.is_paper == True))      # noqa: E712
+    await session.exec(delete(Position).where(Position.is_paper == True))  # noqa: E712
+    await session.commit()
+    logger.info("Paper trading data reset")
+    return RedirectResponse(url="/settings?reset=1", status_code=303)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Stop bot and sell all open positions
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.post("/stop-and-sell", response_class=HTMLResponse)
+async def stop_and_sell(
+    request: Request,
+    session: AsyncSession = Depends(get_db),
+) -> HTMLResponse:
+    import time
+    from datetime import datetime
+    from app.models.position import Position
+    from app.models.trade import Trade, TradeSide, TradeStatus
+
+    # Stop the bot first
+    result = await session.exec(select(BotSettings).where(BotSettings.id == 1))
+    s = result.first()
+    is_paper = True
+    if s:
+        s.is_running = False
+        is_paper = s.paper_trading
+        session.add(s)
+
+    pos_result = await session.exec(select(Position).where(Position.size > 0))
+    positions = pos_result.all()
+
+    sold = failed = 0
+    for pos in positions:
+        try:
+            price = pos.current_price or pos.avg_entry_price or 0.0
+            status = TradeStatus.PAPER
+
+            if not is_paper:
+                from app.services.polymarket_client import get_poly_client
+                poly_client = get_poly_client()
+                fetched = await poly_client.get_midpoint_price(pos.token_id)
+                if fetched is not None:
+                    price = fetched
+                try:
+                    resp = await poly_client.place_order(
+                        token_id=pos.token_id,
+                        side="SELL",
+                        size=pos.size,
+                        price=price,
+                        order_type="FOK",
+                    )
+                    status = (
+                        TradeStatus.FILLED
+                        if resp.get("success") or resp.get("status") in ("matched", "live")
+                        else TradeStatus.FAILED
+                    )
+                except Exception as exc:
+                    logger.error("Sell order failed for %s: %s", pos.condition_id, exc)
+                    status = TradeStatus.FAILED
+
+            proceeds      = pos.size * price
+            trade_pnl     = proceeds - pos.total_cost
+            trade = Trade(
+                source_timestamp=time.time(),
+                condition_id=pos.condition_id,
+                market_title=pos.market_title,
+                token_id=pos.token_id,
+                outcome=pos.outcome,
+                side=TradeSide.SELL,
+                size=pos.size,
+                price=price,
+                usdc_amount=round(proceeds, 6),
+                status=status,
+                realized_pnl=round(trade_pnl, 6),
+                is_paper=pos.is_paper,
+            )
+            session.add(trade)
+
+            if status != TradeStatus.FAILED:
+                pos.realized_pnl += trade_pnl
+                pos.size          = 0.0
+                pos.total_cost    = 0.0
+                pos.updated_at    = datetime.utcnow()
+                session.add(pos)
+                sold += 1
+            else:
+                failed += 1
+        except Exception as exc:
+            logger.error("stop-and-sell error on %s: %s", pos.condition_id, exc)
+            failed += 1
+
+    await session.commit()
+    logger.info("Stop-and-sell complete: %d sold, %d failed", sold, failed)
     return RedirectResponse(url="/", status_code=303)
 
 

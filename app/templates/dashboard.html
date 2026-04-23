@@ -15,6 +15,12 @@
             ⏹ Stop Bot
           </button>
         </form>
+        <form method="POST" action="/settings/stop-and-sell"
+              onsubmit="return confirm('Stop the bot AND sell all open positions at current market price?\n\nThis cannot be undone.')">
+          <button class="bg-orange-900 hover:bg-orange-700 text-orange-200 text-xs font-medium px-4 py-2 rounded-lg transition-colors">
+            ⏹ Stop & Sell All
+          </button>
+        </form>
       {% else %}
         <form method="POST" action="/settings/start">
           <button class="bg-green-700 hover:bg-green-600 text-white text-xs font-medium px-4 py-2 rounded-lg transition-colors">

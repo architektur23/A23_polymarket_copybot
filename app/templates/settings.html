@@ -14,6 +14,11 @@
     <span>✓</span> Settings saved successfully.
   </div>
   {% endif %}
+  {% if reset %}
+  <div class="bg-amber-950 border border-amber-800 text-amber-300 rounded-lg px-4 py-3 text-sm flex items-center gap-2">
+    <span>✓</span> Paper trading data reset — all paper trades and positions cleared.
+  </div>
+  {% endif %}
 
   <form method="POST" action="/settings" class="space-y-5">
 
@@ -190,6 +195,16 @@
           <p class="text-xs text-gray-600">
             In live mode the real wallet USDC balance is used. This value is only used when paper trading is active.
           </p>
+        </div>
+        <div class="border-t border-gray-800 pt-4">
+          <p class="text-xs text-gray-500 mb-3">Reset all paper trades and positions back to zero. This cannot be undone.</p>
+          <form method="POST" action="/settings/reset-paper"
+                onsubmit="return confirm('Delete all paper trades and positions? This cannot be undone.')">
+            <button type="submit"
+                    class="bg-gray-700 hover:bg-red-800 text-gray-300 hover:text-white font-medium rounded-lg px-4 py-2 text-xs transition-colors">
+              Reset Paper Trading Data
+            </button>
+          </form>
         </div>
       </div>
     </div>
