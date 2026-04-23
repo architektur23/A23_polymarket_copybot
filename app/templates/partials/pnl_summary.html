@@ -38,7 +38,7 @@
   </div>
 
   <div class="bg-[#161b27] border border-gray-800 rounded-xl p-4">
-    <p class="text-xs text-gray-500 mb-1">Portfolio Value</p>
+    <p class="text-xs text-gray-500 mb-1">Positions Value</p>
     <p class="text-lg font-bold text-white">
       {% if summary.total_current_value is not none %}{{ "$%.2f"|format(summary.total_current_value) }}{% else %}—{% endif %}
     </p>

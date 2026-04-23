@@ -89,8 +89,11 @@ async def _upsert_position(
     size: float,
     price: float,
     is_paper: bool,
-) -> None:
-    """Create or update the Position row for this market."""
+) -> float | None:
+    """Create or update the Position row for this market.
+
+    Returns the realized PNL for this trade if it was a SELL, else None.
+    """
     from sqlmodel import select
 
     result = await session.exec(
@@ -111,6 +114,8 @@ async def _upsert_position(
         )
         session.add(pos)
 
+    trade_realized_pnl: float | None = None
+
     if side.upper() == "BUY":
         new_cost  = pos.total_cost + (size * price)
         new_size  = pos.size + size
@@ -119,18 +124,20 @@ async def _upsert_position(
         pos.size            = new_size
     else:  # SELL
         # Reduce position; credit proportional cost basis
-        sell_fraction  = size / pos.size if pos.size > 0 else 1.0
-        cost_released  = pos.total_cost * sell_fraction
-        proceeds       = size * price
-        pos.realized_pnl += proceeds - cost_released
-        pos.total_cost   -= cost_released
-        pos.size         = max(0.0, pos.size - size)
+        sell_fraction      = size / pos.size if pos.size > 0 else 1.0
+        cost_released      = pos.total_cost * sell_fraction
+        proceeds           = size * price
+        trade_realized_pnl = proceeds - cost_released
+        pos.realized_pnl  += trade_realized_pnl
+        pos.total_cost    -= cost_released
+        pos.size           = max(0.0, pos.size - size)
         if pos.size < 0.001:
             pos.size       = 0.0
             pos.total_cost = 0.0
 
     pos.updated_at = datetime.utcnow()
     session.add(pos)
+    return trade_realized_pnl
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -251,7 +258,7 @@ async def copy_trade(
     # ── Persist ───────────────────────────────────────────────────────────────
     session.add(trade)
     if trade.status in (TradeStatus.FILLED, TradeStatus.PAPER):
-        await _upsert_position(
+        realized = await _upsert_position(
             session=session,
             condition_id=condition_id,
             token_id=token_id,
@@ -262,6 +269,10 @@ async def copy_trade(
             price=source_price,
             is_paper=settings.paper_trading,
         )
+        if realized is not None:
+            trade.realized_pnl = round(realized, 6)
+            trade.updated_at   = datetime.utcnow()
+            session.add(trade)
     await session.commit()
 
     # ── Notify ────────────────────────────────────────────────────────────────
