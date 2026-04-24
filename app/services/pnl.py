@@ -4,6 +4,12 @@ PNL calculation engine.
 Refreshes unrealized PNL for all open positions by fetching current
 mid-point prices from the CLOB API, then writes the results back to
 the Position table.
+
+When a market's price is unavailable (CLOB returns None), the Gamma API
+is queried to check for resolution. Resolved positions are auto-settled:
+  - Winning outcome: resolution_price = 1.0  → PNL = size - cost
+  - Losing outcome:  resolution_price = 0.0  → PNL = -cost
+A synthetic SELL trade is created for each settled position.
 """
 
 from __future__ import annotations
@@ -22,6 +28,56 @@ from app.services.polymarket_client import PolymarketClient
 logger = logging.getLogger(__name__)
 
 
+async def _settle_resolved_position(
+    session: AsyncSession,
+    pos: Position,
+    resolution_price: float,
+) -> None:
+    """
+    Close a position whose market has resolved on-chain.
+    Creates a settlement Trade record and zeros out the Position.
+    resolution_price = 1.0 for the winning outcome, 0.0 for the losing one.
+    """
+    import time
+
+    from app.models.trade import Trade, TradeSide, TradeStatus
+
+    proceeds      = pos.size * resolution_price
+    realized      = round(proceeds - pos.total_cost, 6)
+    outcome_label = "WON" if resolution_price == 1.0 else "LOST"
+
+    logger.info(
+        "Market resolved — %s %s %.4f shares @ %.2f | PNL %.4f | %s",
+        outcome_label, pos.outcome, pos.size, resolution_price, realized, pos.market_title,
+    )
+
+    session.add(Trade(
+        source_timestamp  = time.time(),
+        condition_id      = pos.condition_id,
+        market_title      = pos.market_title,
+        token_id          = pos.token_id,
+        outcome           = pos.outcome,
+        side              = TradeSide.SELL,
+        size              = pos.size,
+        price             = resolution_price,
+        usdc_amount       = round(proceeds, 6),
+        status            = TradeStatus.PAPER if pos.is_paper else TradeStatus.FILLED,
+        realized_pnl      = realized,
+        is_paper          = pos.is_paper,
+    ))
+
+    pos.realized_pnl      += realized
+    pos.current_price      = resolution_price
+    pos.current_value      = 0.0
+    pos.unrealized_pnl     = 0.0
+    pos.unrealized_pnl_pct = 0.0
+    pos.size               = 0.0
+    pos.total_cost         = 0.0
+    pos.market_resolved    = True
+    pos.updated_at         = datetime.utcnow()
+    session.add(pos)
+
+
 async def refresh_unrealized_pnl(
     session: AsyncSession,
     poly_client: PolymarketClient,
@@ -29,6 +85,10 @@ async def refresh_unrealized_pnl(
     """
     For every open Position (size > 0), fetch the current mid-price and
     update current_value / unrealized_pnl / unrealized_pnl_pct.
+
+    When get_midpoint_price() returns None (market no longer on the CLOB),
+    the Gamma API is checked for resolution. If resolved, the position is
+    auto-settled via _settle_resolved_position().
 
     Returns a summary dict with aggregate stats for the dashboard.
     """
@@ -40,13 +100,35 @@ async def refresh_unrealized_pnl(
     total_cost_basis  = 0.0
     total_value       = 0.0
 
-    # Fetch all prices concurrently
     async def fetch_and_update(pos: Position) -> None:
         nonlocal total_unrealized, total_realized, total_cost_basis, total_value
 
         price = await poly_client.get_midpoint_price(pos.token_id)
+
         if price is None:
-            # Fall back to last known price or entry price
+            # Market no longer active on CLOB — check if it has resolved
+            try:
+                market = await poly_client.get_market_by_condition_id(pos.condition_id)
+                if market and market.get("resolved"):
+                    tokens = market.get("tokens") or []
+                    winning_id = next(
+                        (
+                            t.get("token_id") or t.get("tokenId")
+                            for t in tokens
+                            if t.get("winner")
+                        ),
+                        None,
+                    )
+                    resolution_price = (
+                        1.0 if (winning_id and pos.token_id == winning_id) else 0.0
+                    )
+                    await _settle_resolved_position(session, pos, resolution_price)
+                    total_realized += pos.realized_pnl
+                    return
+            except Exception as exc:
+                logger.warning("Resolution check failed for %s: %s", pos.condition_id, exc)
+
+            # Not resolved yet or check failed — keep last known price
             price = pos.current_price or pos.avg_entry_price
 
         cur_value      = pos.size * price
@@ -87,7 +169,6 @@ async def get_portfolio_summary(session: AsyncSession) -> dict[str, Any]:
     all_positions = result.all()
 
     open_pos   = [p for p in all_positions if p.size > 0]
-    closed_pos = [p for p in all_positions if p.size <= 0]
 
     total_unrealized  = sum(p.unrealized_pnl or 0.0 for p in open_pos)
     total_realized    = sum(p.realized_pnl        for p in all_positions)
@@ -101,5 +182,4 @@ async def get_portfolio_summary(session: AsyncSession) -> dict[str, Any]:
         "total_exposure_usdc":  round(total_exposure,   4),
         "total_current_value":  round(total_value,      4),
         "open_position_count":  len(open_pos),
-        "closed_position_count": len(closed_pos),
     }

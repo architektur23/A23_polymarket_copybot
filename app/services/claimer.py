@@ -180,8 +180,12 @@ async def auto_claim(
         if claim_result["success"]:
             from datetime import datetime
 
+            token_id_from_api = pos_data.get("asset", "")
             result = await session.exec(
-                select(Position).where(Position.condition_id == condition_id)
+                select(Position).where(
+                    Position.condition_id == condition_id,
+                    Position.token_id     == token_id_from_api,
+                )
             )
             db_pos = result.first()
             if db_pos:
