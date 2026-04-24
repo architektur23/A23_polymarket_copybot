@@ -115,8 +115,8 @@ async def refresh_unrealized_pnl(
             except ValueError:
                 pass
 
-        # Call Gamma when: no CLOB price, past scheduled end, or end_date not yet stored
-        if price is None or past_end_date or pos.market_end_date is None:
+        # Call Gamma when: no CLOB price, or past the market's scheduled end date
+        if price is None or past_end_date:
             try:
                 market = await poly_client.get_market_by_condition_id(pos.condition_id)
                 if market:

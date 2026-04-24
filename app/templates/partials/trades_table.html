@@ -26,10 +26,15 @@
           {{ t.market_title[:40] }}{% if t.market_title|length > 40 %}…{% endif %}
         </td>
         <td class="px-4 py-3">
-          {% if t.outcome|lower == 'yes' %}
-            <span class="font-bold bg-green-950 text-green-400 border border-green-900 px-2 py-0.5 rounded-full">YES</span>
+          {% set o = t.outcome if t.outcome else '' %}
+          {% if o|lower == 'yes' %}
+            <span class="font-bold bg-green-950 text-green-400 border border-green-900 px-2 py-0.5 rounded-full">{{ o }}</span>
+          {% elif o|lower == 'no' %}
+            <span class="font-bold bg-red-950 text-red-400 border border-red-900 px-2 py-0.5 rounded-full">{{ o }}</span>
+          {% elif o %}
+            <span class="font-bold bg-blue-950 text-blue-400 border border-blue-900 px-2 py-0.5 rounded-full">{{ o }}</span>
           {% else %}
-            <span class="font-bold bg-red-950 text-red-400 border border-red-900 px-2 py-0.5 rounded-full">NO</span>
+            <span class="text-gray-500">—</span>
           {% endif %}
         </td>
         <td class="px-4 py-3 text-center">
