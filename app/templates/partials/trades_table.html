@@ -26,15 +26,27 @@
           {{ t.market_title[:40] }}{% if t.market_title|length > 40 %}…{% endif %}
         </td>
         <td class="px-4 py-3">
-          {% set o = t.outcome if t.outcome else '' %}
-          {% if o|lower == 'yes' %}
-            <span class="font-bold bg-green-950 text-green-400 border border-green-900 px-2 py-0.5 rounded-full">{{ o }}</span>
-          {% elif o|lower == 'no' %}
-            <span class="font-bold bg-red-950 text-red-400 border border-red-900 px-2 py-0.5 rounded-full">{{ o }}</span>
-          {% elif o %}
-            <span class="font-bold bg-blue-950 text-blue-400 border border-blue-900 px-2 py-0.5 rounded-full">{{ o }}</span>
+          {% set _t = (t.market_title or '')|lower %}
+          {% set _up = 'above' in _t or 'over' in _t or 'higher' in _t or 'exceed' in _t or 'reach' in _t or 'surpass' in _t or 'more than' in _t %}
+          {% set _dn = 'below' in _t or 'under' in _t or 'lower' in _t or 'fall' in _t or 'drop' in _t or 'less than' in _t %}
+          {% set _oc = (t.outcome or '')|lower %}
+          {% if _up or _dn %}
+            {% if (_up and _oc == 'yes') or (_dn and _oc == 'no') %}
+              <span class="font-bold bg-green-950 text-green-400 border border-green-900 px-2 py-0.5 rounded-full" title="{{ t.outcome }}">↑ UP</span>
+            {% else %}
+              <span class="font-bold bg-red-950 text-red-400 border border-red-900 px-2 py-0.5 rounded-full" title="{{ t.outcome }}">↓ DOWN</span>
+            {% endif %}
           {% else %}
-            <span class="text-gray-500">—</span>
+            {% set o = t.outcome if t.outcome else '' %}
+            {% if o|lower == 'yes' %}
+              <span class="font-bold bg-green-950 text-green-400 border border-green-900 px-2 py-0.5 rounded-full">{{ o }}</span>
+            {% elif o|lower == 'no' %}
+              <span class="font-bold bg-red-950 text-red-400 border border-red-900 px-2 py-0.5 rounded-full">{{ o }}</span>
+            {% elif o %}
+              <span class="font-bold bg-blue-950 text-blue-400 border border-blue-900 px-2 py-0.5 rounded-full">{{ o }}</span>
+            {% else %}
+              <span class="text-gray-500">—</span>
+            {% endif %}
           {% endif %}
         </td>
         <td class="px-4 py-3 text-center">

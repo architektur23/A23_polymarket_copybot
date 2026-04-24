@@ -22,15 +22,27 @@
           {{ pos.market_title[:48] }}{% if pos.market_title|length > 48 %}…{% endif %}
         </td>
         <td class="px-4 py-3">
-          {% set o = pos.outcome if pos.outcome else '' %}
-          {% if o|lower == 'yes' %}
-            <span class="text-xs font-bold bg-green-950 text-green-400 border border-green-900 px-2 py-0.5 rounded-full">{{ o }}</span>
-          {% elif o|lower == 'no' %}
-            <span class="text-xs font-bold bg-red-950 text-red-400 border border-red-900 px-2 py-0.5 rounded-full">{{ o }}</span>
-          {% elif o %}
-            <span class="text-xs font-bold bg-blue-950 text-blue-400 border border-blue-900 px-2 py-0.5 rounded-full">{{ o }}</span>
+          {% set _t = (pos.market_title or '')|lower %}
+          {% set _up = 'above' in _t or 'over' in _t or 'higher' in _t or 'exceed' in _t or 'reach' in _t or 'surpass' in _t or 'more than' in _t %}
+          {% set _dn = 'below' in _t or 'under' in _t or 'lower' in _t or 'fall' in _t or 'drop' in _t or 'less than' in _t %}
+          {% set _oc = (pos.outcome or '')|lower %}
+          {% if _up or _dn %}
+            {% if (_up and _oc == 'yes') or (_dn and _oc == 'no') %}
+              <span class="text-xs font-bold bg-green-950 text-green-400 border border-green-900 px-2 py-0.5 rounded-full" title="{{ pos.outcome }}">↑ UP</span>
+            {% else %}
+              <span class="text-xs font-bold bg-red-950 text-red-400 border border-red-900 px-2 py-0.5 rounded-full" title="{{ pos.outcome }}">↓ DOWN</span>
+            {% endif %}
           {% else %}
-            <span class="text-gray-500">—</span>
+            {% set o = pos.outcome if pos.outcome else '' %}
+            {% if o|lower == 'yes' %}
+              <span class="text-xs font-bold bg-green-950 text-green-400 border border-green-900 px-2 py-0.5 rounded-full">{{ o }}</span>
+            {% elif o|lower == 'no' %}
+              <span class="text-xs font-bold bg-red-950 text-red-400 border border-red-900 px-2 py-0.5 rounded-full">{{ o }}</span>
+            {% elif o %}
+              <span class="text-xs font-bold bg-blue-950 text-blue-400 border border-blue-900 px-2 py-0.5 rounded-full">{{ o }}</span>
+            {% else %}
+              <span class="text-gray-500">—</span>
+            {% endif %}
           {% endif %}
         </td>
         <td class="px-4 py-3 text-right tabular-nums text-gray-300">{{ "%.4f"|format(pos.size) }}</td>
