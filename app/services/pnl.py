@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from sqlmodel import select
@@ -105,31 +105,55 @@ async def refresh_unrealized_pnl(
 
         price = await poly_client.get_midpoint_price(pos.token_id)
 
-        if price is None:
-            # Market no longer active on CLOB — check if it has resolved
+        # ── Time-based expiry check ───────────────────────────────────────
+        now_utc = datetime.now(timezone.utc)
+        past_end_date = False
+        if pos.market_end_date:
+            try:
+                end_dt = datetime.fromisoformat(pos.market_end_date.replace("Z", "+00:00"))
+                past_end_date = now_utc > end_dt
+            except ValueError:
+                pass
+
+        # Call Gamma when: no CLOB price, past scheduled end, or end_date not yet stored
+        if price is None or past_end_date or pos.market_end_date is None:
             try:
                 market = await poly_client.get_market_by_condition_id(pos.condition_id)
-                if market and market.get("resolved"):
-                    tokens = market.get("tokens") or []
-                    winning_id = next(
-                        (
-                            t.get("token_id") or t.get("tokenId")
-                            for t in tokens
-                            if t.get("winner")
-                        ),
-                        None,
-                    )
-                    resolution_price = (
-                        1.0 if (winning_id and pos.token_id == winning_id) else 0.0
-                    )
-                    await _settle_resolved_position(session, pos, resolution_price)
-                    total_realized += pos.realized_pnl
-                    return
+                if market:
+                    # Opportunistically store end_date (one-time, prevents future calls)
+                    if pos.market_end_date is None:
+                        end_iso = market.get("endDateIso") or market.get("endDate")
+                        if end_iso:
+                            pos.market_end_date = end_iso
+                            try:
+                                end_dt = datetime.fromisoformat(end_iso.replace("Z", "+00:00"))
+                                past_end_date = now_utc > end_dt
+                            except ValueError:
+                                pass
+
+                    # Only settle if we believe the market has actually closed
+                    if (price is None or past_end_date) and market.get("resolved"):
+                        tokens = market.get("tokens") or []
+                        winning_id = next(
+                            (
+                                t.get("token_id") or t.get("tokenId")
+                                for t in tokens
+                                if t.get("winner")
+                            ),
+                            None,
+                        )
+                        resolution_price = (
+                            1.0 if (winning_id and pos.token_id == winning_id) else 0.0
+                        )
+                        await _settle_resolved_position(session, pos, resolution_price)
+                        total_realized += pos.realized_pnl
+                        return
             except Exception as exc:
                 logger.warning("Resolution check failed for %s: %s", pos.condition_id, exc)
 
             # Not resolved yet or check failed — keep last known price
-            price = pos.current_price or pos.avg_entry_price
+            if price is None:
+                price = pos.current_price or pos.avg_entry_price
 
         cur_value      = pos.size * price
         unrealized     = cur_value - pos.total_cost
