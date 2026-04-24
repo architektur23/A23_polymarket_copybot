@@ -60,7 +60,17 @@ def calculate_copy_size(
         if source_equity_usdc > 0:
             ratio       = source_usdc / source_equity_usdc   # e.g. 0.02 = 2%
             target_usdc = ratio * our_balance_usdc
-            target_usdc = max(target_usdc, settings.min_trade_usdc)
+            if target_usdc > our_balance_usdc:
+                # ratio > 100% — source equity is underestimated (e.g. active trader
+                # with mostly resolved short-term positions). Fall back to minimum.
+                logger.warning(
+                    "Proportional ratio %.0f%% exceeds 100%% — source equity likely "
+                    "underestimated (equity=%.2f, trade=%.2f). Using min_trade_usdc.",
+                    ratio * 100, source_equity_usdc, source_usdc,
+                )
+                target_usdc = settings.min_trade_usdc
+            else:
+                target_usdc = max(target_usdc, settings.min_trade_usdc)
         else:
             # Source equity unknown — fall back to minimum
             logger.warning("Source equity unknown, using min_trade_usdc as fallback")
@@ -239,7 +249,7 @@ async def copy_trade(
         return None
 
     # ── Max exposure check ────────────────────────────────────────────────────
-    if settings.max_exposure_pct > 0 and not settings.paper_trading:
+    if settings.max_exposure_pct > 0:
         trade_usdc = copy_size * source_price
         if balance > 0 and (trade_usdc / balance * 100) > settings.max_exposure_pct:
             logger.warning(
