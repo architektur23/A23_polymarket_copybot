@@ -19,7 +19,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from app.config import get_settings
-from app.database import init_db, migrate_add_columns
+from app.database import init_db, migrate_add_columns, migrate_position_unique_key
 from app.log_buffer import setup_logging
 
 logger = logging.getLogger(__name__)
@@ -38,6 +38,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # 1. Initialise database
     await init_db()
     await migrate_add_columns()
+    await migrate_position_unique_key()
     logger.info("Database ready")
 
     # 2. Seed default BotSettings row (id=1) if not present

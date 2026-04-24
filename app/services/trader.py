@@ -97,7 +97,10 @@ async def _upsert_position(
     from sqlmodel import select
 
     result = await session.exec(
-        select(Position).where(Position.condition_id == condition_id)
+        select(Position).where(
+            Position.condition_id == condition_id,
+            Position.outcome == outcome,
+        )
     )
     pos = result.first()
 
@@ -178,11 +181,14 @@ async def copy_trade(
     if side.upper() == "SELL":
         from sqlmodel import select as _select
         _chk = await session.exec(
-            _select(Position).where(Position.condition_id == condition_id)
+            _select(Position).where(
+                Position.condition_id == condition_id,
+                Position.outcome == outcome,
+            )
         )
         _existing = _chk.first()
         if _existing is None or _existing.size <= 0:
-            logger.info("Skipping SELL — no open position for market %s", condition_id)
+            logger.info("Skipping SELL — no open %s position for market %s", outcome, condition_id)
             return None
 
     # ── Size calculation ──────────────────────────────────────────────────────

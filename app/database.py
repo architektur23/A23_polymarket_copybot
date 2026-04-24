@@ -36,6 +36,69 @@ async def init_db() -> None:
         )
 
 
+async def migrate_position_unique_key() -> None:
+    """
+    One-time migration: change positions table unique constraint from
+    condition_id alone to (condition_id, outcome).
+    Idempotent — only runs if the old single-column unique index exists.
+    """
+    import logging
+    import sqlalchemy
+
+    _logger = logging.getLogger(__name__)
+
+    async with engine.begin() as conn:
+        result = await conn.execute(sqlalchemy.text(
+            "SELECT sql FROM sqlite_master "
+            "WHERE type='index' AND tbl_name='positions' AND sql LIKE '%condition_id%'"
+        ))
+        rows = result.fetchall()
+        has_old_unique = any(
+            r[0] and "unique" in r[0].lower() and "outcome" not in r[0].lower()
+            for r in rows
+        )
+        if not has_old_unique:
+            return  # already migrated or fresh install
+
+        _logger.info("Migrating positions table: unique(condition_id) → unique(condition_id, outcome)")
+
+        await conn.execute(sqlalchemy.text("""
+            CREATE TABLE positions_new (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                condition_id TEXT NOT NULL,
+                market_title TEXT NOT NULL DEFAULT '',
+                token_id    TEXT NOT NULL DEFAULT '',
+                outcome     TEXT NOT NULL DEFAULT '',
+                size        REAL NOT NULL DEFAULT 0.0,
+                avg_entry_price REAL NOT NULL DEFAULT 0.0,
+                total_cost  REAL NOT NULL DEFAULT 0.0,
+                current_price REAL,
+                current_value REAL,
+                unrealized_pnl REAL,
+                unrealized_pnl_pct REAL,
+                realized_pnl REAL NOT NULL DEFAULT 0.0,
+                market_resolved INTEGER NOT NULL DEFAULT 0,
+                redeemable  INTEGER NOT NULL DEFAULT 0,
+                market_end_date TEXT,
+                opened_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                is_paper    INTEGER NOT NULL DEFAULT 1,
+                UNIQUE(condition_id, outcome)
+            )
+        """))
+        await conn.execute(sqlalchemy.text(
+            "INSERT OR IGNORE INTO positions_new "
+            "SELECT id, condition_id, market_title, token_id, outcome, size, "
+            "avg_entry_price, total_cost, current_price, current_value, "
+            "unrealized_pnl, unrealized_pnl_pct, realized_pnl, "
+            "market_resolved, redeemable, market_end_date, "
+            "opened_at, updated_at, is_paper FROM positions"
+        ))
+        await conn.execute(sqlalchemy.text("DROP TABLE positions"))
+        await conn.execute(sqlalchemy.text("ALTER TABLE positions_new RENAME TO positions"))
+        _logger.info("Position table migration complete")
+
+
 async def migrate_add_columns() -> None:
     """
     Idempotently add columns introduced after the initial schema creation.

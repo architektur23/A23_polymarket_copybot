@@ -47,7 +47,7 @@
   <div class="bg-[#161b27] border border-gray-800 rounded-xl p-4">
     <p class="text-xs text-gray-500 mb-1">{% if settings is defined and settings.paper_trading %}Paper Cash{% else %}USDC Balance{% endif %}</p>
     <p class="text-lg font-bold text-white">
-      {% if balance is defined and balance %}{{ "$%.2f"|format(balance) }}{% else %}—{% endif %}
+      {% if balance is defined and balance is not none %}{{ "$%.2f"|format(balance) }}{% else %}—{% endif %}
     </p>
   </div>
 

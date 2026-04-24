@@ -8,6 +8,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Optional
 
+from sqlalchemy import UniqueConstraint
 from sqlmodel import Field, SQLModel
 
 
@@ -15,11 +16,12 @@ class Position(SQLModel, table=True):
     """Current open positions (updated in-place)."""
 
     __tablename__ = "positions"
+    __table_args__ = (UniqueConstraint("condition_id", "outcome"),)
 
     id: Optional[int] = Field(default=None, primary_key=True)
 
     # ── Market identity ───────────────────────────────────────────────────────
-    condition_id: str = Field(unique=True, index=True)
+    condition_id: str = Field(index=True)
     market_title: str = Field(default="")
     token_id: str = Field(default="")
     outcome: str = Field(default="")          # "Yes" / "No"
