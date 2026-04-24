@@ -160,13 +160,20 @@ async def start_bot(
     request: Request,
     session: AsyncSession = Depends(get_db),
 ) -> HTMLResponse:
+    from sqlmodel import delete
+    from app.models.position import Position
+
     result = await session.exec(select(BotSettings).where(BotSettings.id == 1))
     s = result.first()
     if s:
         s.is_running = True
         session.add(s)
-        await session.commit()
-        logger.info("Bot started")
+
+    # Wipe closed positions so realized/total PNL starts fresh each session
+    await session.exec(delete(Position).where(Position.size <= 0))
+
+    await session.commit()
+    logger.info("Bot started")
     return RedirectResponse(url="/", status_code=303)
 
 

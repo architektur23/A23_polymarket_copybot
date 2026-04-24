@@ -17,7 +17,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.database import get_db
 from app.models.position import Position
 from app.models.settings import BotSettings
-from app.models.trade import Trade
+from app.models.trade import Trade, TradeSide, TradeStatus
 from app.services.pnl import get_portfolio_summary
 
 router = APIRouter(tags=["dashboard"])
@@ -38,7 +38,7 @@ async def dashboard(
 ) -> HTMLResponse:
     settings = await _get_settings(session)
     summary  = await get_portfolio_summary(session)
-    balance  = await _get_balance(request)
+    balance  = await _get_balance(request, session, settings)
     return _templates(request).TemplateResponse(
         "dashboard.html",
         {
@@ -76,11 +76,12 @@ async def partial_pnl(
     request: Request,
     session: AsyncSession = Depends(get_db),
 ) -> HTMLResponse:
-    summary = await get_portfolio_summary(session)
-    balance = await _get_balance(request)
+    settings = await _get_settings(session)
+    summary  = await get_portfolio_summary(session)
+    balance  = await _get_balance(request, session, settings)
     return _templates(request).TemplateResponse(
         "partials/pnl_summary.html",
-        {"request": request, "summary": summary, "balance": balance},
+        {"request": request, "summary": summary, "balance": balance, "settings": settings},
     )
 
 
@@ -108,8 +109,27 @@ async def _get_settings(session: AsyncSession) -> BotSettings:
     return s
 
 
-async def _get_balance(request: Request) -> float:
+async def _get_balance(request: Request, session: AsyncSession, settings: BotSettings) -> float:
     try:
+        if settings.paper_trading:
+            from sqlmodel import func
+            spent_res = await session.exec(
+                select(func.sum(Trade.usdc_amount)).where(
+                    Trade.is_paper == True,          # noqa: E712
+                    Trade.side == TradeSide.BUY,
+                    Trade.status == TradeStatus.PAPER,
+                )
+            )
+            recv_res = await session.exec(
+                select(func.sum(Trade.usdc_amount)).where(
+                    Trade.is_paper == True,          # noqa: E712
+                    Trade.side == TradeSide.SELL,
+                    Trade.status == TradeStatus.PAPER,
+                )
+            )
+            spent    = spent_res.one() or 0.0
+            received = recv_res.one() or 0.0
+            return max(0.0, settings.paper_balance_usdc - spent + received)
         from app.services.polymarket_client import get_poly_client
         return await get_poly_client().get_usdc_balance()
     except Exception:

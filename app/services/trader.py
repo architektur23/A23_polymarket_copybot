@@ -174,11 +174,46 @@ async def copy_trade(
         logger.warning("Skipping trade with zero size/price: %s", raw_trade)
         return None
 
+    # Skip SELL if we have no open position for this market — prevents fake PNL
+    if side.upper() == "SELL":
+        from sqlmodel import select as _select
+        _chk = await session.exec(
+            _select(Position).where(Position.condition_id == condition_id)
+        )
+        _existing = _chk.first()
+        if _existing is None or _existing.size <= 0:
+            logger.info("Skipping SELL — no open position for market %s", condition_id)
+            return None
+
     # ── Size calculation ──────────────────────────────────────────────────────
     from app.services.monitor import fetch_wallet_equity
+    from sqlmodel import func, select as _sel
 
     source_usdc = source_size * source_price
-    balance     = await poly_client.get_usdc_balance() if not settings.paper_trading else settings.paper_balance_usdc
+
+    if settings.paper_trading:
+        _spent_res = await session.exec(
+            _sel(func.sum(Trade.usdc_amount)).where(
+                Trade.is_paper == True,         # noqa: E712
+                Trade.side == TradeSide.BUY,
+                Trade.status == TradeStatus.PAPER,
+            )
+        )
+        _recv_res = await session.exec(
+            _sel(func.sum(Trade.usdc_amount)).where(
+                Trade.is_paper == True,         # noqa: E712
+                Trade.side == TradeSide.SELL,
+                Trade.status == TradeStatus.PAPER,
+            )
+        )
+        _spent    = _spent_res.one() or 0.0
+        _received = _recv_res.one() or 0.0
+        balance   = max(0.0, settings.paper_balance_usdc - _spent + _received)
+        if balance <= 0:
+            logger.info("Paper balance exhausted (%.2f), skipping trade", balance)
+            return None
+    else:
+        balance = await poly_client.get_usdc_balance()
 
     # For proportional mode, fetch the source wallet's current equity
     source_equity = 0.0
