@@ -321,6 +321,51 @@
       </div>
     </div>
 
+    <!-- ── Royalty ──────────────────────────────────────────────────────────── -->
+    <div class="bg-[#161b27] border border-gray-800 rounded-xl overflow-hidden">
+      <div class="px-5 py-3 border-b border-gray-800">
+        <h2 class="text-sm font-semibold text-indigo-400 uppercase tracking-wider">About the Royalty System</h2>
+      </div>
+      <div class="p-5 space-y-3 text-xs text-gray-400">
+        <p>
+          This bot uses a <span class="text-gray-200 font-medium">profit-share model</span> instead of an upfront fee.
+          Once every <span class="text-gray-200 font-medium">30 days</span>, the bot automatically calculates your
+          net realized profit from live trades over the previous 30 days. If there was a net profit,
+          the percentage you set below is transferred in USDC to the developer's wallet on the Polygon network.
+        </p>
+
+        <div class="space-y-1.5">
+          <label class="block text-xs font-medium text-gray-400">
+            Royalty percentage
+            <span class="text-gray-600 font-normal ml-1">(1–20% of 30-day net profit · Default: 1%)</span>
+          </label>
+          <div class="flex items-center gap-2">
+            <input type="number" name="royalty_pct"
+                   value="{{ settings.royalty_pct }}"
+                   min="1" max="20" step="0.5"
+                   class="w-28 bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-gray-100 text-sm
+                          focus:outline-none focus:border-indigo-500" />
+            <span class="text-xs text-gray-500">% of 30-day net profit — only sent in live mode when profitable</span>
+          </div>
+        </div>
+
+        <ul class="space-y-1.5 text-gray-500">
+          <li class="flex items-start gap-2">
+            <span class="text-green-500 mt-0.5">✓</span>
+            <span>No profit made → <span class="text-gray-300">nothing is sent</span></span>
+          </li>
+          <li class="flex items-start gap-2">
+            <span class="text-green-500 mt-0.5">✓</span>
+            <span>Paper trading mode → <span class="text-gray-300">no transfer, ever</span></span>
+          </li>
+          <li class="flex items-start gap-2">
+            <span class="text-yellow-600 mt-0.5">!</span>
+            <span>Make sure your wallet holds a small amount of <span class="text-gray-300">POL</span> for Polygon gas fees</span>
+          </li>
+        </ul>
+      </div>
+    </div>
+
     <button type="submit"
             class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-lg px-4 py-2.5 text-sm transition-colors">
       Save Settings
@@ -329,47 +374,6 @@
 
   {# Standalone form for reset-paper — must live outside the main form #}
   <form id="reset-paper-form" method="POST" action="/settings/reset-paper"></form>
-
-  <!-- ── Royalty Info ─────────────────────────────────────────────────────── -->
-  <div class="bg-[#161b27] border border-gray-800 rounded-xl overflow-hidden">
-    <div class="px-5 py-3 border-b border-gray-800">
-      <h2 class="text-sm font-semibold text-indigo-400 uppercase tracking-wider">About the Royalty System</h2>
-    </div>
-    <div class="p-5 space-y-3 text-xs text-gray-400">
-      <p>
-        This bot uses a <span class="text-gray-200 font-medium">profit-share model</span> instead of an upfront fee.
-        Once every <span class="text-gray-200 font-medium">30 days</span>, the bot automatically calculates your
-        net realized profit from live trades over the previous 30 days. If there was a net profit,
-        <span class="text-gray-200 font-medium">1% of that amount</span> is transferred in USDC to the developer's
-        wallet on the Polygon network.
-      </p>
-      <ul class="space-y-1.5 text-gray-500">
-        <li class="flex items-start gap-2">
-          <span class="text-green-500 mt-0.5">✓</span>
-          <span>No profit made → <span class="text-gray-300">nothing is sent</span></span>
-        </li>
-        <li class="flex items-start gap-2">
-          <span class="text-green-500 mt-0.5">✓</span>
-          <span>Paper trading mode → <span class="text-gray-300">no transfer, ever</span> (no real USDC involved)</span>
-        </li>
-        <li class="flex items-start gap-2">
-          <span class="text-green-500 mt-0.5">✓</span>
-          <span>The transfer comes from your trading wallet automatically — no manual action needed</span>
-        </li>
-        <li class="flex items-start gap-2">
-          <span class="text-green-500 mt-0.5">✓</span>
-          <span>Every transfer is logged in the <a href="/logs" class="text-indigo-400 hover:text-indigo-300">Logs</a> page and sent via webhook if configured</span>
-        </li>
-        <li class="flex items-start gap-2">
-          <span class="text-yellow-600 mt-0.5">!</span>
-          <span>Make sure your wallet holds a small amount of <span class="text-gray-300">POL</span> for Polygon gas fees</span>
-        </li>
-      </ul>
-      <p class="text-gray-600">
-        Example: if you made $200 profit over 30 days, the bot sends $2.00 USDC to the developer. If you made $0 or a loss, nothing is sent.
-      </p>
-    </div>
-  </div>
 
   <!-- ── One-time Allowance Setup ──────────────────────────────────────────── -->
   <div class="bg-[#161b27] border border-gray-800 rounded-xl overflow-hidden">

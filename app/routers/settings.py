@@ -84,6 +84,8 @@ async def save_settings(
     blacklisted_markets:    Annotated[str,   Form()] = "",
     # ── Notifications ────────────────────────────────────────────────────────
     webhook_url:            Annotated[str,   Form()] = "",
+    # ── Royalty ──────────────────────────────────────────────────────────────
+    royalty_pct:            Annotated[float, Form()] = 1.0,
 ) -> HTMLResponse:
     result = await session.exec(select(BotSettings).where(BotSettings.id == 1))
     s = result.first() or BotSettings(id=1)
@@ -122,6 +124,7 @@ async def save_settings(
     s.max_position_usdc     = max(0.0, max_position_usdc)
     s.blacklisted_markets   = blacklisted_markets.strip()
     s.webhook_url           = webhook_url.strip() or None
+    s.royalty_pct           = max(1.0, min(royalty_pct, 20.0))
 
     session.add(s)
     await session.commit()

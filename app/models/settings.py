@@ -75,6 +75,9 @@ class BotSettings(SQLModel, table=True):
     # ── Notifications ─────────────────────────────────────────────────────────
     webhook_url: Optional[str] = Field(default=None)
 
+    # ── Royalty ───────────────────────────────────────────────────────────────
+    royalty_pct: float = Field(default=1.0)
+
     # ── Bot state ────────────────────────────────────────────────────────────
     is_running:           bool           = Field(default=False)
     last_poll_at:         Optional[str]  = Field(default=None)
