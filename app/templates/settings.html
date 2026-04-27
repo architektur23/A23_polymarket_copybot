@@ -286,6 +286,13 @@
                    class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-gray-100 text-xs
                           focus:outline-none focus:border-indigo-500" />
           </div>
+          <div class="space-y-1.5">
+            <label class="block text-xs font-medium text-gray-400">Max trades per market <span class="text-gray-600">(0 = uncapped)</span></label>
+            <input type="number" name="max_trades_per_market"
+                   value="{{ settings.max_trades_per_market }}" min="0" step="1"
+                   class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-gray-100 text-xs
+                          focus:outline-none focus:border-indigo-500" />
+          </div>
         </div>
         <div class="space-y-1.5">
           <label class="block text-xs font-medium text-gray-400">Blacklisted markets <span class="text-gray-600">(comma-separated conditionIds)</span></label>

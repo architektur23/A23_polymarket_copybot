@@ -201,6 +201,25 @@ async def copy_trade(
             logger.info("Skipping SELL — no open %s position for market %s", outcome, condition_id)
             return None
 
+    # ── Max trades per market check ───────────────────────────────────────────
+    if side.upper() == "BUY" and settings.max_trades_per_market > 0:
+        from sqlmodel import func, select as _sel
+        count_res = await session.exec(
+            _sel(func.count(Trade.id)).where(
+                Trade.condition_id == condition_id,
+                Trade.side == TradeSide.BUY,
+                Trade.is_paper == settings.paper_trading,
+                Trade.status.in_([TradeStatus.FILLED, TradeStatus.PAPER]),
+            )
+        )
+        trade_count = count_res.one() or 0
+        if trade_count >= settings.max_trades_per_market:
+            logger.info(
+                "Skipping trade — market %s already has %d/%d copied trades",
+                condition_id, trade_count, settings.max_trades_per_market,
+            )
+            return None
+
     # ── Size calculation ──────────────────────────────────────────────────────
     from app.services.monitor import fetch_wallet_equity
     from sqlmodel import func, select as _sel

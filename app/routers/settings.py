@@ -81,6 +81,7 @@ async def save_settings(
     # ── Risk ─────────────────────────────────────────────────────────────────
     max_exposure_pct:       Annotated[float, Form()] = 80.0,
     max_position_usdc:      Annotated[float, Form()] = 0.0,
+    max_trades_per_market:  Annotated[int,   Form()] = 3,
     blacklisted_markets:    Annotated[str,   Form()] = "",
     # ── Notifications ────────────────────────────────────────────────────────
     webhook_url:            Annotated[str,   Form()] = "",
@@ -122,6 +123,7 @@ async def save_settings(
     s.poll_interval_seconds = max(5, poll_interval_seconds)
     s.max_exposure_pct      = max(0.0, min(max_exposure_pct, 100.0))
     s.max_position_usdc     = max(0.0, max_position_usdc)
+    s.max_trades_per_market = max(0, max_trades_per_market)
     s.blacklisted_markets   = blacklisted_markets.strip()
     s.webhook_url           = webhook_url.strip() or None
     s.royalty_pct           = max(1.0, min(royalty_pct, 20.0))

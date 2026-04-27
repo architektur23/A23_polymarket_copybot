@@ -70,6 +70,10 @@ class BotSettings(SQLModel, table=True):
         default=0.0,
         description="Per-trade cap in USDC (0 = disabled)",
     )
+    max_trades_per_market: int = Field(
+        default=3,
+        description="Max BUY trades copied per market/condition (0 = uncapped)",
+    )
     blacklisted_markets: str = Field(default="")
 
     # ── Notifications ─────────────────────────────────────────────────────────

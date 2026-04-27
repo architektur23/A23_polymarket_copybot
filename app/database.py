@@ -109,6 +109,7 @@ async def migrate_add_columns() -> None:
     stmts = [
         "ALTER TABLE bot_settings ADD COLUMN paper_balance_usdc REAL NOT NULL DEFAULT 1000.0",
         "ALTER TABLE bot_settings ADD COLUMN royalty_pct REAL NOT NULL DEFAULT 1.0",
+        "ALTER TABLE bot_settings ADD COLUMN max_trades_per_market INTEGER NOT NULL DEFAULT 3",
     ]
     async with engine.begin() as conn:
         for stmt in stmts:
