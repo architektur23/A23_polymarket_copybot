@@ -172,6 +172,23 @@ async def refresh_unrealized_pnl(
         total_value       += cur_value
 
     await asyncio.gather(*[fetch_and_update(p) for p in positions])
+
+    # Lazily populate market_end_date for one position per cycle (sequential,
+    # never concurrent) so the time-based resolution check can eventually fire.
+    missing_end_dates = [p for p in positions if p.market_end_date is None]
+    if missing_end_dates:
+        candidate = missing_end_dates[0]
+        try:
+            market_info = await poly_client.get_market_by_condition_id(candidate.condition_id)
+            if market_info:
+                end_iso = market_info.get("endDateIso") or market_info.get("endDate")
+                if end_iso:
+                    candidate.market_end_date = end_iso
+                    session.add(candidate)
+                    logger.debug("Stored end_date=%s for %s", end_iso, candidate.condition_id)
+        except Exception as exc:
+            logger.warning("Could not fetch end_date for %s: %s", candidate.condition_id, exc)
+
     await session.commit()
 
     return {

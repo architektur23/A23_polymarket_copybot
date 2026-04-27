@@ -187,7 +187,9 @@ async def copy_trade(
         logger.warning("Skipping trade with zero size/price: %s", raw_trade)
         return None
 
-    # Skip SELL if we have no open position for this market — prevents fake PNL
+    # Skip SELL if we have no open position for this market — prevents fake PNL.
+    # Also cache the position object so the SELL sizing path can reuse it.
+    _open_position = None
     if side.upper() == "SELL":
         from sqlmodel import select as _select
         _chk = await session.exec(
@@ -196,12 +198,12 @@ async def copy_trade(
                 Position.outcome == outcome,
             )
         )
-        _existing = _chk.first()
-        if _existing is None or _existing.size <= 0:
+        _open_position = _chk.first()
+        if _open_position is None or _open_position.size <= 0:
             logger.info("Skipping SELL — no open %s position for market %s", outcome, condition_id)
             return None
 
-    # ── Max trades per market check ───────────────────────────────────────────
+    # ── Max trades per market check (BUY only) ────────────────────────────────
     if side.upper() == "BUY" and settings.max_trades_per_market > 0:
         from sqlmodel import func, select as _sel
         count_res = await session.exec(
@@ -221,61 +223,88 @@ async def copy_trade(
             return None
 
     # ── Size calculation ──────────────────────────────────────────────────────
-    from app.services.monitor import fetch_wallet_equity
+    from app.services.monitor import fetch_target_positions, fetch_wallet_equity
     from sqlmodel import func, select as _sel
 
     source_usdc = source_size * source_price
 
-    if settings.paper_trading:
-        _spent_res = await session.exec(
-            _sel(func.sum(Trade.usdc_amount)).where(
-                Trade.is_paper == True,         # noqa: E712
-                Trade.side == TradeSide.BUY,
-                Trade.status == TradeStatus.PAPER,
-            )
-        )
-        _recv_res = await session.exec(
-            _sel(func.sum(Trade.usdc_amount)).where(
-                Trade.is_paper == True,         # noqa: E712
-                Trade.side == TradeSide.SELL,
-                Trade.status == TradeStatus.PAPER,
-            )
-        )
-        _spent    = _spent_res.one() or 0.0
-        _received = _recv_res.one() or 0.0
-        balance   = max(0.0, settings.paper_balance_usdc - _spent + _received)
-        if balance <= 0:
-            logger.info("Paper balance exhausted (%.2f), skipping trade", balance)
+    if side.upper() == "SELL":
+        # Close our position in the same proportion they closed theirs.
+        # Fetch their remaining size after the sell to reconstruct the fraction.
+        copy_size = _open_position.size  # default: close our full position
+        if settings.target_wallet:
+            try:
+                their_positions = await fetch_target_positions(settings.target_wallet)
+                their_entry = next(
+                    (
+                        p for p in their_positions
+                        if p.get("conditionId", "").lower() == condition_id.lower()
+                        and (p.get("outcome") or "").lower() == outcome.lower()
+                    ),
+                    None,
+                )
+                their_remaining = float(their_entry.get("size", 0)) if their_entry else 0.0
+                their_before    = their_remaining + source_size
+                if their_before > 0:
+                    fraction  = min(1.0, source_size / their_before)
+                    copy_size = round(_open_position.size * fraction, 4)
+            except Exception as exc:
+                logger.warning("SELL sizing defaulting to full close for %s: %s", condition_id, exc)
+        copy_size = max(0.0, min(copy_size, _open_position.size))
+        if copy_size <= 0:
             return None
+
     else:
-        balance = await poly_client.get_usdc_balance()
-
-    # For proportional mode, fetch the source wallet's current equity
-    source_equity = 0.0
-    if settings.sizing_mode.value == "proportional" and settings.target_wallet:
-        source_equity = await fetch_wallet_equity(settings.target_wallet)
-
-    copy_size = calculate_copy_size(
-        source_usdc=source_usdc,
-        source_price=source_price,
-        settings=settings,
-        our_balance_usdc=balance,
-        source_equity_usdc=source_equity,
-    )
-
-    if copy_size <= 0:
-        logger.info("Calculated copy size = 0, skipping trade %s", tx_hash)
-        return None
-
-    # ── Max exposure check ────────────────────────────────────────────────────
-    if settings.max_exposure_pct > 0:
-        trade_usdc = copy_size * source_price
-        if balance > 0 and (trade_usdc / balance * 100) > settings.max_exposure_pct:
-            logger.warning(
-                "Trade %.2f USDC would exceed max exposure %.1f%% (balance %.2f)",
-                trade_usdc, settings.max_exposure_pct, balance,
+        # BUY: use available cash balance and calculate_copy_size
+        if settings.paper_trading:
+            _spent_res = await session.exec(
+                _sel(func.sum(Trade.usdc_amount)).where(
+                    Trade.is_paper == True,         # noqa: E712
+                    Trade.side == TradeSide.BUY,
+                    Trade.status == TradeStatus.PAPER,
+                )
             )
+            _recv_res = await session.exec(
+                _sel(func.sum(Trade.usdc_amount)).where(
+                    Trade.is_paper == True,         # noqa: E712
+                    Trade.side == TradeSide.SELL,
+                    Trade.status == TradeStatus.PAPER,
+                )
+            )
+            _spent    = _spent_res.one() or 0.0
+            _received = _recv_res.one() or 0.0
+            balance   = max(0.0, settings.paper_balance_usdc - _spent + _received)
+            if balance <= 0:
+                logger.info("Paper balance exhausted (%.2f), skipping BUY", balance)
+                return None
+        else:
+            balance = await poly_client.get_usdc_balance()
+
+        source_equity = 0.0
+        if settings.sizing_mode.value == "proportional" and settings.target_wallet:
+            source_equity = await fetch_wallet_equity(settings.target_wallet)
+
+        copy_size = calculate_copy_size(
+            source_usdc=source_usdc,
+            source_price=source_price,
+            settings=settings,
+            our_balance_usdc=balance,
+            source_equity_usdc=source_equity,
+        )
+
+        if copy_size <= 0:
+            logger.info("Calculated copy size = 0, skipping trade %s", tx_hash)
             return None
+
+        # ── Max exposure check (BUY only) ─────────────────────────────────────
+        if settings.max_exposure_pct > 0:
+            trade_usdc = copy_size * source_price
+            if balance > 0 and (trade_usdc / balance * 100) > settings.max_exposure_pct:
+                logger.warning(
+                    "Trade %.2f USDC would exceed max exposure %.1f%% (balance %.2f)",
+                    trade_usdc, settings.max_exposure_pct, balance,
+                )
+                return None
 
     # ── Build Trade record ────────────────────────────────────────────────────
     trade = Trade(
